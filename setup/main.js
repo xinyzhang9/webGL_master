@@ -1,5 +1,6 @@
 var gl;
 var shaderProgram;
+var vertexCount = 5000;
 initGL();
 createShaders();
 createVertices();
@@ -26,23 +27,24 @@ function createShaders(){
 }
 
 function createVertices(){
-	vertices = [-0.5, -0.5, 0.0, 
-				0.5, -0.5, 0.0,
-				0.0, 0.5, 0.0,
-				];
+	vertices = [];
+	for (var i = 0;i < vertexCount; i++){
+		vertices.push(Math.random()*2-1);
+		vertices.push(Math.random()*2-1);
+	}
 	var buffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
-	gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(vertices),gl.STATIC_DRAW);
+	gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(vertices),gl.DYNAMIC_DRAW);
 
 	//get attribute
 	var coords = gl.getAttribLocation(shaderProgram,'coords');
 	// gl.vertexAttrib3f(coords,0.5,-0.5,0);
-	gl.vertexAttribPointer(coords,3,gl.FLOAT,false,0,0);
+	gl.vertexAttribPointer(coords,2,gl.FLOAT,false,0,0);
 	gl.enableVertexAttribArray(coords);
-	gl.bindBuffer(gl.ARRAY_BUFFER,null);
+	// gl.bindBuffer(gl.ARRAY_BUFFER,null);
 
 	var pointSize = gl.getAttribLocation(shaderProgram,'pointSize');
-	gl.vertexAttrib1f(pointSize,30);
+	gl.vertexAttrib1f(pointSize,1);
 
 	//get uniform
 	var color = gl.getUniformLocation(shaderProgram,'color');
@@ -51,8 +53,15 @@ function createVertices(){
 }
 
 function draw(){
+	for(var i = 0; i < vertexCount * 2; i += 2){
+		vertices[i] += Math.random() * 0.01 - 0.005;
+		vertices[i + 1] += Math.random() * 0.01 - 0.005;
+	}
+	gl.bufferSubData(gl.ARRAY_BUFFER,0,new Float32Array(vertices));
 	gl.clear(gl.COLOR_BUFFER_BIT);
-	gl.drawArrays(gl.TRIANGLES,0,3);
+	gl.drawArrays(gl.POINTS,0,vertexCount);
+
+	requestAnimationFrame(draw);
 }
 
 function getShader(gl, id, type) {
