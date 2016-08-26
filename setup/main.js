@@ -47,8 +47,7 @@ function createShaders(){
 function createVertices(){
 	vertices = [-0.5, -0.5, 0.0, 
 				0.5, -0.5, 0.0,
-				0.5, 0.5, 0.0,
-				-0.5, 0.5, 0.0
+				0.0, 0.5, 0.0,
 				];
 	var buffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
@@ -72,7 +71,7 @@ function createVertices(){
 
 function draw(){
 	gl.clear(gl.COLOR_BUFFER_BIT);
-	gl.drawArrays(gl.POINTS,0,4);
+	gl.drawArrays(gl.TRIANGLES,0,3);
 }
 
 
