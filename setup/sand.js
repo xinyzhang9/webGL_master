@@ -1,7 +1,18 @@
-var gl,
-	shaderProgram,
-	vertices,
-	angle = 0;
+var gl;
+var shaderProgram;
+var vertexCount = 20000;
+var mouseX = 0;
+var mouseY = 0;
+
+canvas.addEventListener('mousemove',function(event){
+	mouseX = map(event.clientX,0,canvas.width, -1,1);
+	mouseY = map(event.clientY,0,canvas.height,1,-1);
+
+});
+
+function map(value,minSrc,maxSrc,minDst,maxDst){
+	return (value - minSrc) / (maxSrc - minSrc) * (maxDst - minDst) + minDst;
+}
 
 initGL();
 createShaders();
@@ -29,61 +40,48 @@ function createShaders(){
 }
 
 function createVertices(){
-	vertices = [-0.5, -0.5, 0.0, 
-				0.5, -0.5, 0.0,
-				0.0, 0.5, 0.0,
-				];
+	vertices = [];
+	for (var i = 0;i < vertexCount; i++){
+		vertices.push(Math.random()*2-1);
+		vertices.push(Math.random()*2-1);
+	}
 	var buffer = gl.createBuffer();
 	gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
-	gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(vertices),gl.STATIC_DRAW);
+	gl.bufferData(gl.ARRAY_BUFFER,new Float32Array(vertices),gl.DYNAMIC_DRAW);
 
 	//get attribute
 	var coords = gl.getAttribLocation(shaderProgram,'coords');
 	// gl.vertexAttrib3f(coords,0.5,-0.5,0);
-	gl.vertexAttribPointer(coords,3,gl.FLOAT,false,0,0);
+	gl.vertexAttribPointer(coords,2,gl.FLOAT,false,0,0);
 	gl.enableVertexAttribArray(coords);
-	gl.bindBuffer(gl.ARRAY_BUFFER,null);
+	// gl.bindBuffer(gl.ARRAY_BUFFER,null);
 
 	var pointSize = gl.getAttribLocation(shaderProgram,'pointSize');
-	gl.vertexAttrib1f(pointSize,30);
+	gl.vertexAttrib1f(pointSize,1);
 
 	//get uniform
 	var color = gl.getUniformLocation(shaderProgram,'color');
-	gl.uniform4f(color,0.2,0,1,1);
+	gl.uniform4f(color,1,0.65,0,1);
 
 }
 
 function draw(){
-	rotateY(angle += 0.01);
+	for(var i = 0; i < vertexCount * 2; i += 2){
+		var dx = vertices[i] - mouseX,
+			dy = vertices[i + 1] - mouseY,
+			dist = Math.sqrt(dx * dx + dy * dy);
+		if(dist < 0.2){
+			vertices[i] = mouseX + dx / dist * 0.2;
+			vertices[ i + 1] = mouseY + dy / dist * 0.2;
+		}
+		vertices[i] += Math.random() * 0.01 - 0.005;
+		vertices[i + 1] += Math.random() * 0.01 - 0.005;
+	}
+	gl.bufferSubData(gl.ARRAY_BUFFER,0,new Float32Array(vertices));
 	gl.clear(gl.COLOR_BUFFER_BIT);
-	gl.drawArrays(gl.TRIANGLES,0,3);
+	gl.drawArrays(gl.POINTS,0,vertexCount);
+
 	requestAnimationFrame(draw);
-}
-
-function rotateZ(angle){
-	var cos = Math.cos(angle),
-		sin = Math.sin(angle),
-		matrix = new Float32Array([
-					cos, sin, 0, 0,
-					-sin, cos, 0, 0,
-					0, 0, 1, 0,
-					0, 0, 0, 1
-					]);
-	var transformMatrix = gl.getUniformLocation(shaderProgram, "transformMatrix");
-	gl.uniformMatrix4fv(transformMatrix, false, matrix);
-}
-
-function rotateY(angle){
-	var cos = Math.cos(angle),
-		sin = Math.sin(angle),
-		matrix = new Float32Array([
-					cos, 0, sin, 0,
-					0, 1, 0, 0,
-					-sin, 0, cos, 0,
-					0, 0, 0, 1
-					]);
-	var transformMatrix = gl.getUniformLocation(shaderProgram, "transformMatrix");
-	gl.uniformMatrix4fv(transformMatrix, false, matrix);
 }
 
 function getShader(gl, id, type) {
@@ -121,3 +119,5 @@ function getShader(gl, id, type) {
     
   return shader;
 }
+
+
