@@ -1,20 +1,51 @@
 <html>
 <head>
-	<title>fire effect</title>
+	<title>Fire Effect</title>
 	<link type="text/css" href="css/webgl-tutorials.css" rel="stylesheet" />
 	<script type="text/javascript" src="js_helpers/webgl-utils.js"></script>
 	<script type="text/javascript" src="js_helpers/mathHelper.js"></script>
 	<script type="text/javascript" src="js_helpers/otherHelper.js"></script>
 	<script type="text/javascript" src="js_helpers/perlin.js"></script>
 	<script type="text/javascript" src = "main.js"></script>
+	<!-- vertex shader -->
+	<script id="2d-vertex-shader" type="x-shader/x-vertex">
+		attribute vec2 a_position;
+		attribute vec4 a_color;
+		attribute vec2 a_texture_coord;
+		varying vec4 v_color;
+		varying vec2 v_texture_coord;
+		uniform vec2 u_resolution;
+		void main() {
+		  vec2 clipSpace = (a_position/u_resolution)*2.0-1.0;
+		  gl_Position = vec4(clipSpace * vec2(1, -1), 0, 1);
+		  v_color = a_color;
+		  v_texture_coord = a_texture_coord;
+		}
+	</script>
+	<!-- fragment shader -->
+	<script id="2d-fragment-shader" type="x-shader/x-fragment">
+	precision mediump float;
+	varying vec4 v_color;
+	varying highp vec2 v_texture_coord;
+	uniform sampler2D u_sampler;
+	void main() {
+	   vec2 uv = gl_FragCoord.xy/vec2(800,600); 
+	   ;
+	   vec4 texColor = texture2D(u_sampler,v_texture_coord.xy);
+	   vec4 finalColor;
+	   finalColor.r = texColor.r*v_color.r;
+	   finalColor.g = texColor.g*v_color.g;
+	   finalColor.b = texColor.b*v_color.b;
+	   finalColor.a = texColor.a*v_color.a;
+	   gl_FragColor = finalColor;
+	}
+	</script>
 
 </head>
-<body onload = 'start()'>
+<body>
     <div class="containerDiv">
         <div class="leftPanel"> <canvas id="canvas" width="600" height="600"></canvas> </div>
-        <div class="rightPanel">
-          <h3>Particle Settings</h3>
-
+        <div class="rightPanel" id = "rightPanel">
           <label for="fireEmitRate">Emit Rate</label>
           <input id="fireEmitRate" class="range" type="range" style="width:300px;">
           <div id="fireEmitRateVal" class="valueIndicator"></div> particles/second<br>
@@ -47,7 +78,7 @@
           <input id="fireTriangleness" class="range" type="range"></input>
           <div id="fireTrianglenessVal" class="valueIndicator"></div><br>
 
-          <div style="line-height: 64px;">
+          <div style="line-height: 64px;" id = "texture_settingnumParticles">
           <label for="fireTexture">Texture</label>
           <select id="fireTexture" class="textureComboBox"></select> 
           <img style="display:inline-block; vertical-align: middle;" id="fireTextureVal" width="64" height="64" src="textures/gradient.png"></img><br>
@@ -59,12 +90,12 @@
           <div style="line-height: 64px;">
           <label for="fireTextureHue">Hue</label>
           <input id="fireTextureHue" class="range" type="range"></input>
-          <div id="fireTextureHueVal" style="width:64px; height: 64px; display:inline-block; background-color:white;">4</div><br>
+          <div id="fireTextureHueVal" style="width:64px; height: 64px; display:inline-block; border-radius: 50%; background-color:white; text-align: center;">4</div><br>
           </div>
 
           <label for="fireTextureHueVariance">Hue Variance</label>
           <input id="fireTextureHueVariance" class="range" type="range"></input>
-          <div id="fireTextureHueVarianceVal" class="valueIndicator"></div>degrees<br>
+          <div id="fireTextureHueVarianceVal" class="valueIndicator"></div> degrees<br>
 
           <label for="sparks">Enable Sparks</label>
           <input id="sparks" type="checkbox" checked></input><br>
@@ -72,7 +103,7 @@
           <label for="wind">Enable Wind</label>
           <input id="wind" type="checkbox" checked></input><br><br>
 
-          <label for="omnidirectionalWind">Enable Omnidirectional Wind</label>
+          <label for="omnidirectionalWind">Enable Directional Wind</label>
           <input id="omnidirectionalWind" type="checkbox"></input><br><br>
 
           <label for="windTurbulance">Wind Turbulance</label>
