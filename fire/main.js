@@ -203,7 +203,253 @@ function setupSlider(id,valueId,value,sliderMinMax,step,changeCallback){
 	slider.oninput();
 }
 
+//initialize the scene
+//main function
+function start(){
+	//init webGL
+	canvas = document.getElementById('canvas');
+	gl = getWebGLContext(canvas);
+	if(!gl){
+		return;
+	}
+	loadAllTextures();
 
+	var tex = gl.createTexture();
+	gl.bindTexture(gl.TEXTURE_2D,tex);
+	gl.texImage2D(gl.TEXTURE_2D,0,gl.RGBA,1,1,0,gl.RGBA,gl.UNSIGNED_BYTE,new Uint8Array([255,0,0,255]));//red
+	gl.clearColor(0.0,0.0,0.0,1.0);
+	vertexBuffer = gl.createBuffer();
+	colorBuffer = gl.createBuffer();
+	squareTextureCoordinateVertices = gl.createBuffer();
 
+	//setup GLSL program
+	vertexShader = createShaderFromScriptElement(gl,'2d-vertex-shader');
+	fragmentShader = createShaderFromScriptElement(gl,'2d-fragment-shader');
+	program = createProgram(gl,[vertexShader,fragmentShader]);
+	gl.useProgram(program);
+
+	//look up where the vertex data need to go
+	positionAttrib = gl.getAttribLocation(program,'a_position');
+	gl.enableVertexAttribArray(positionAttrib);
+
+	colorAttrib = gl.getAttribLocation(program,'a_color');
+	gl.enableVertexAttribArray(colorAttrib);
+
+	textureCoordAttribute = gl.getAttribLocation(program,'a_texture_coord');
+	gl.enableVertexAttribArray(textureCoordAttribute);
+
+	//lookup uniforms
+	resolutionLocation = gl.getUniformLocation(program,'u_resolution');
+	cameraLocation = gl.getUniformLocation(program,'cam_position');
+	textureSamplerLocation = gl.getUniformLocation(program,'u_sampler');
+
+	//setup UI
+	setupSlider("fireEmitRate","fireEmitRateVal",options.fireEmitRate,options.fireEmitRateSlider,1,function(newValue) {
+		options.fireEmitRate = +newValue;
+	});
+
+	setupSlider("fireSize","fireSizeVal",options.fireSize,options.fireSizeSlider,1,function(newValue) {
+		options.fireSize = +newValue;
+	});
+
+	setupSlider("fireSizeVariance","fireSizeVarianceVal",options.fireSizeVariance,options.fireSizeVarianceSlider,0.01,function(newValue) {
+		options.fireSizeVariance = +newValue;
+	});
+
+	setupSlider("fireEmitAngleVariance","fireEmitAngleVarianceVal",options.fireEmitAngleVariance,options.fireEmitAngleVarianceSlider,0.0001,function(newValue) {
+		options.fireEmitAngleVariance = +newValue;
+	});
+
+	setupSlider("fireSpeed","fireSpeedVal",options.fireSpeed,options.fireSpeedSlider,0.01,function(newValue) {
+		options.fireSpeed = +newValue;
+	});
+
+	setupSlider("fireSpeedVariance","fireSpeedVarianceVal",options.fireSpeedVariance,options.fireSpeedVarianceSlider,0.01,function(newValue) {
+		options.fireSpeedVariance = +newValue;
+	});
+
+	setupSlider("fireDeathSpeed","fireDeathSpeedVal",options.fireDeathSpeed,options.fireDeathSpeedSlider,0.000001,function(newValue) {
+		options.fireDeathSpeed = +newValue;
+	});
+
+	setupSlider("fireTriangleness","fireTrianglenessVal",options.fireTriangleness,options.fireTrianglenessSlider,0.000001,function(newValue) {
+		options.fireTriangleness = +newValue;
+	});
+
+	setupSlider("fireTextureHue","fireTextureHueVal",options.fireTextureHueSlider,0.01,function(newValue){
+		options.fireTextureHue = +newValue;
+		var hue = convertHue(options.fireTextureHue);
+		document.getElementById('fireTextureHueVal').style.backgroundColor = rgbToHex(HSVtoRGB(hue,1.0,1.0));
+	});
+
+	setupSlider("fireTextureHueVariance","fireTextureHueVarianceVal",options.fireTextureVariance,options.fireTextureHueVarianceSlider,0.01,function(newValue){
+		options.fireTextureHueVariance = +newValue;
+	});
+
+	document.getElementById('fireTextureColorize').onchange = function(){
+		options.fireTextureColorize = this.checked;
+	};
+
+	document.getElementById('sparks').onchange = function(){
+		options.sparks = this.checked;
+	};
+
+	document.getElementById('wind').onchange = function(){
+		options.wind = this.checked;
+	};
+
+	document.getElementById('omnidirectionalWind').onchange = function(){
+		options.omnidirectionalWind = this.checked;
+	};
+
+	setupSlider("windStrength","windStrengthVal",options.windStrength,options.windStrengthSlider,0.01,function(newValue){
+		options.windStrength = +newValue;
+	});
+
+	setupSlider("windTurbulance","windTurbulanceVal",options.windTurbulance,options.windTurbulanceSlider,0.00001,function(newValue){
+		options.windTurbulance = +newValue;
+	});
+
+	document.onkeydown = handleKeyDown;
+	document.onkeyup = handleKeyUp;
+	canvas.onmousedown = handleMouseDown;
+	document.onmouseup = handleMouseUp;
+	document.onmousemove = handleMouseMove;
+
+	gl.blendFunc(gl.SRC_ALPHA,gl.ONE);
+	gl.enable(gl.BLEND);
+	gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_MAG_FILTER,gl.LINEAR);
+	gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_S,gl.CLAMP_TO_EDGE);
+	gl.texParameteri(gl.TEXTURE_2D,gl.TEXTURE_WRAP_T,gl.CLAMP_TO_EDGE);
+
+	animloop();
+
+}
+
+//main loop
+function animloop(){
+	requestAnimFrame(animloop);
+	timing();
+	logic();
+	render();
+}
+
+//timing calculates the framerate
+framerate = 18;
+lastTime = time();
+lastFPSDivUpdate = time();
+function timing(){
+	currentTime = time();
+	frameTime = frameTime * 0.9 + (currentTime - lastTime) * 0.1;
+	fps = 1000.0/frameTime;
+	if(currentTime - lastFPSDivUpdate > 100){
+		document.getElementById('fps').innerHTML = "FPS: "+Math.round(fps);
+		lastFPSDivUpdate = currentTime;
+	}
+	lastTime = currentTime;
+}
+
+function keyCodePressed(charVal){
+	return currentlyPressedKeys[charVal.charCodeAt(0)];
+}
+
+function time(){
+	var d = new Date();
+	var n = d.getTime();
+	return n;
+}
+
+var particleDiscrepancy = 0;
+var lastParticleTime = time();
+
+var sparkParticleDiscrepancy = 0;
+noise.seed(Math.random());
+
+//calculate new positions for all the particles
+function logic(){
+	var currentparticleTime = time();
+	var timeDifference = currentParticleTime - lastParticleTime;
+
+	//limit timeDifference
+	if(timeDifference > 100){
+		timeDifference = 100;
+	}
+
+	//update fire particles
+	particleDiscrepancy += options.fireEmitRate*(timeDifference)/1000.0;
+	while(particleDiscrepancy > 0){
+		createFireParticle({
+			x:canvas.width/2,
+			u:canvas.height/2 + 200
+		});
+		particleDiscrepancy -= 1.0;
+	}
+
+	particleAverage = {x:0,y:0};
+	var numParts = fireParticles.length;
+	for(var i = 0; i < numParts; i++){
+		particleAverage.x += fireParticles[i].pos.x/numParts;
+		particleAverage.y += fireParticles[i].pos.y/numParts;
+	}
+
+	for(var i = 0; i < fireParticles.length; i++){
+		var x = fireParticles[i].pos.x;
+		var y = fireParticles[i].pos.y;
+
+		//apply wind to the velocity
+		if(options.wind){
+			if(options.omnidirectionalWind){
+				fireParticles[i].vel = addVecs(fireParticles[i].vel,scaleVec(unitVec((noise.samplex3(x/500,y/500,lastParticleTime * options.windTurbulance)+1.0)*Math.PI),options.windStrength));
+			}else{
+				fireParticles[i].vel = addVecs(fireParticles[i].vel,scaleVec(unitVec((noise.samplex3(x/500,y/500,lastParticleTime * options.windTurbulance)+1.0)*Math.PI*0.5),options.windStrength));
+			}
+		}
+		//move the particle
+		fireParticles[i].pos = addVecs(fireParticles[i].pos,scaleVec(fireParticles[i].vel,timeDifference/1000.0));
+
+		if(fireParticles[i].pos.y <= -fireParticles[i].size.height * 2 || fireParticles[i].color.a <= 0){
+			markForDeletion(fireParticles,i);
+		}
+	}
+	fireParticles = deleteMarked(fireParticles);
+
+	//update spark particles
+	sparkParticleDiscrepancy += options.sparkEmitRate * (timeDifference) / 1000.0;
+	while (sparkParticleDiscrepancy > 0){
+		createSparkParticle({x:canvas.width/2,y:canvas.height/2 + 200});
+		sparkParticleDiscrepancy -= 100;
+	}
+
+	for(var i = 0; i < sparkParticles.length; i++){
+		var x = sparkParticles[i].pos.x;
+		var y = sparkParticles[i].pos.y;
+		sparkParticles[i].vel = addVecs(sparkParticles[i].vel,scaleVec(unitVec((noise.simplex3(x/500,y/500,lastParticleTime*0.0003)+1.0)*Math.PI*0.5),20.0));
+		sparkParticles[i].pos = addVecs(sparkParticles[i].pos,scaleVec(sparkParticles[i].vel,timeDifference/1000.0));
+
+		sparkParticles[i].color.a -= options.sparkDeathSpeed;
+
+		if(sparkParticles[i].pos.y <= -sparkParticles[i].size.height*2 || sparkParticles[i].color.a <= 0){
+			markForDeletion(sparkParticles,i);
+		}
+	}
+	sparkParticles = deleteMarked(sparkParticles);
+
+	document.getElementById('numParticles').innerHTML = 'Number of Particles: ' + (fireParticles.length + sparkParticles.length);
+		
+	lastParticleTime = currentParticleTime;
+}
+
+function render(){
+	gl.clear(gl.COLOR_BUFFER_BIT || gl.DEPTH_BUFFER_BIT);
+	//set resolution
+	gl.uniform2f(resolutionLocation,canvas.width,canvas.height);
+	gl.uniform1i(textureSamplerLocation,0);
+
+	drawRects(fireParticles);
+	if(options.sparks){
+		drawRects(sparkParticles);
+		console.log(particleAverage);
+	}
+}
 
 
